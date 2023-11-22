@@ -15,7 +15,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CustomerApiRequest;
-use App\Models\Customer;
 use App\Repositories\CustomerRepository;
 use Illuminate\Http\Response;
 
@@ -262,13 +261,15 @@ class CustomerController extends Controller
     public function show(string $customer)
     {
         try {
-            $result = Customer::find($customer);
+            $customer = $this->customerRepository
+                ->find($customer);
 
-            if (!$result) {
+            if (!$customer) {
                 return response()->json(['message' => 'Customer not found.'], 404);
             }
 
-            return response()->json($result);
+            return response()->json($customer);
+
         } catch (\Exception $e) {
             $message = "Ocorreu um erro ao processar a solicitação.";
             $statusCode = 500;
@@ -281,7 +282,7 @@ class CustomerController extends Controller
      * Update the specified customer in storage.
      *
      * @param \App\Http\Requests\CustomerApiRequest $request  Customer data.
-     * @param \App\Models\Customer                  $customer The customer to update.
+     * @param \Illuminate\Http\Response             $customer The customer to update.
      *
      * @return \Illuminate\Http\JsonResponse A JSON response with the updated.
      *
@@ -390,16 +391,17 @@ class CustomerController extends Controller
     public function update(CustomerApiRequest $request, $customer)
     {
         try {
-            $customer = Customer::find($customer);
+            $customer = $this->customerRepository
+                ->find($customer);
 
             if (!$customer) {
                 return response()->json(['message' => 'Customer not found.'], 404);
             }
+
             return response()
                 ->json(
                     $this->customerRepository
                         ->update(
-                            $customer,
                             $request
                         )
                 );
@@ -458,9 +460,10 @@ class CustomerController extends Controller
     public function destroy(string $customer)
     {
         try {
-            $customerExist = Customer::find($customer);
+            $customer = $this->customerRepository
+                ->find($customer);
 
-            if (!$customerExist) {
+            if (!$customer) {
                 return response()->json(['message' => 'Customer not found.'], 404);
             }
 
@@ -521,7 +524,7 @@ class CustomerController extends Controller
     public function restore(string $customer)
     {
         try {
-            $restoreExist = Customer::onlyTrashed()->find($customer);
+            $restoreExist = $this->customerRepository->findOnlyTrashed($customer);
 
             if (!$restoreExist) {
                 return response()->json(['message' => 'Customer not found.'], 404);
