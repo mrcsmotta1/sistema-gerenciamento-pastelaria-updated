@@ -13,9 +13,13 @@
 
 namespace Tests\Unit\Api;
 
+use App\Http\Controllers\Api\CustomerController;
+use App\Http\Requests\CustomerApiRequest;
 use App\Models\Customer;
+use App\Repositories\CustomerRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\Fluent\AssertableJson;
+use Mockery;
 use Tests\TestCase;
 
 /**
@@ -35,6 +39,11 @@ use Tests\TestCase;
 class CustomerControllerTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function tearDown(): void
+    {
+        Mockery::close();
+    }
 
     /**
      * A basic unit test example.
@@ -211,6 +220,7 @@ class CustomerControllerTest extends TestCase
         $id = $result['id'];
 
         $customer = [
+            "id" => $id,
             "name" => "Test Update",
             "email" => "test@test.com",
             "phone" => "(11)9 1234-1234",
@@ -517,5 +527,217 @@ class CustomerControllerTest extends TestCase
         $response->assertJson([
             'message' => 'O campo zipcode é obrigatório.',
         ]);
+    }
+
+    /**
+     * This test should return error 500 in the Customer index.
+     *
+     * @return void
+     */
+    public function test_index_must_return_error_500_when_there_is_an_error_customer_endpoint(): void
+    {
+        $mockRepository = $this->createMock(CustomerRepository::class);
+        $mockRepository->method('index')->willThrowException(new \Exception('Test exception'));
+
+        $controller = new CustomerController($mockRepository);
+        $response = $controller->index();
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJson($response->getContent());
+        $expectedJson = '{"message": "Ocorreu um erro ao processar a solicitação."}';
+        $this->assertJsonStringEqualsJsonString($expectedJson, $response->getContent());
+    }
+
+    /**
+     * This test should return error 500 in the Customer store.
+     *
+     * @return void
+     */
+    public function test_store_must_return_error_500_when_there_is_an_error_customer_endpoint(): void
+    {
+        $mockRepository = $this->createMock(CustomerRepository::class);
+        $mockRepository->method('add')->willThrowException(new \Exception('Test exception'));
+
+        $controller = new CustomerController($mockRepository);
+
+        $request = new CustomerApiRequest();
+
+        $response = $controller->store($request);
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJsonStringEqualsJsonString('{"message": "Ocorreu um erro ao processar a solicitação."}', $response->getContent());
+    }
+
+    /**
+     * This test should return error 500 in the Customer show.
+     *
+     * @return void
+     */
+    public function test_show_must_return_error_500_when_there_is_an_error_customer_endpoint(): void
+    {
+        $mockRepository = $this->createMock(CustomerRepository::class);
+        $mockRepository->method('find')->willThrowException(new \Exception('Test exception'));
+
+        $controller = new CustomerController($mockRepository);
+
+        $response = $controller->show('customer_id');
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJsonStringEqualsJsonString('{"message": "Ocorreu um erro ao processar a solicitação."}', $response->getContent());
+    }
+
+    /**
+     * Test the 'update' endpoint for return 404.
+     *
+     * This test verifies that the 'update' endpoint in the customers controller correctly handles
+     * the update of customer information based on the provided data.
+     *
+     * @return void
+     */
+    public function test_put_update_must_return_404_when_customer_not_found_in_customers_endpoint(): void
+    {
+        $result = Customer::factory(1)->createOne();
+        $id = $result['id'] + rand(50, 100);
+
+        $customer = [
+            "id" => $id,
+            "name" => "Test Update",
+            "email" => "test@test.com",
+            "phone" => "(11)9 1234-1234",
+            "date_of_birth" => "1982-12-01",
+            "address" => "Rua Hum",
+            "complement" => "number 23",
+            "neighborhood" => "Aclimação",
+            "zipcode" => "01234-001",
+        ];
+
+        $response = $this->putJson("/api/customers/{$id}", $customer);
+
+        $response->assertStatus(404);
+        $response->assertJson([
+            'message' => 'Customer not found.',
+        ]);
+    }
+
+    /**
+     * This test should return error 500 in the Customer update.
+     *
+     * @return void
+     */
+    public function test_update_must_return_error_500_when_there_is_an_error_customer_endpoint(): void
+    {
+        $result = Customer::factory(1)->createOne();
+        $id = $result['id'];
+
+        $customerModel = new Customer();
+
+        $repositoryMock = $this->getMockBuilder(CustomerRepository::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $repositoryMock->expects($this->once())
+            ->method('find')
+            ->will($this->returnValue($customerModel));
+
+        $repositoryMock->expects($this->once())
+            ->method('update')
+            ->willThrowException(new \Exception('Simulated error'));
+
+        $this->app->instance(CustomerRepository::class, $repositoryMock);
+
+        $customer = [
+            "id" => $id,
+            "name" => "Test Update",
+            "email" => "test@test.com",
+            "phone" => "(11)9 1234-1234",
+            "date_of_birth" => "1982-12-01",
+            "address" => "Rua Hum",
+            "complement" => "number 23",
+            "neighborhood" => "Aclimação",
+            "zipcode" => "01234-001",
+        ];
+
+        $response = $this->putJson("/api/customers/{$id}", $customer);
+
+        $response->assertStatus(500);
+        $this->assertJsonStringEqualsJsonString('{"message": "Ocorreu um erro ao processar a solicitação."}', $response->getContent());
+    }
+
+    /**
+     * Test the 'destroy' endpoint for deleting a customer return 404.
+     *
+     * This test verifies that the 'soft deleted' endpoint in the customers controller correctly handles
+     * the deletion of a customer based on the provided identifier.
+     *
+     * @return void
+     */
+    public function test_delete_destroy_must_return_404_when_customer_not_exists_in_customers_endpoint(): void
+    {
+        $result = Customer::factory(1)->createOne();
+        $id = $result['id'] + rand(50, 100);
+
+        $response = $this->deleteJson("/api/customers/{$id}");
+
+        $response->assertStatus(404);
+        $response->assertJson([
+            'message' => 'Customer not found.',
+        ]);
+    }
+
+    /**
+     * This test should return error 500 in the Customer show.
+     *
+     * @return void
+     */
+    public function test_delete_must_return_error_500_when_there_is_an_error_customer_endpoint(): void
+    {
+        $mockRepository = $this->createMock(CustomerRepository::class);
+        $mockRepository->method('find')->willThrowException(new \Exception('Test exception'));
+
+        $controller = new CustomerController($mockRepository);
+
+        $response = $controller->destroy('customer_id');
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJsonStringEqualsJsonString('{"message": "Ocorreu um erro ao processar a solicitação."}', $response->getContent());
+    }
+
+    /**
+     * Test the 'update' endpoint for return 404.
+     *
+     * This test verifies that the 'update' endpoint in the customers controller correctly handles
+     * the update of customer information based on the provided data.
+     *
+     * @return void
+     */
+    public function test_post_restore_must_return_404_when_customer_not_found_in_customers_endpoint(): void
+    {
+        $result = Customer::factory(1)->createOne();
+        $id = $result['id'] + rand(50, 100);
+
+        $response = $this->postJson("/api/customers/{$id}/restore");
+
+        $response->assertStatus(404);
+        $response->assertJson([
+            'message' => 'Customer not found.',
+        ]);
+    }
+
+    /**
+     * This test should return error 500 in the Customer show.
+     *
+     * @return void
+     */
+    public function test_post_restore_must_return_error_500_when_there_is_an_error_customer_endpoint(): void
+    {
+        $mockRepository = $this->createMock(CustomerRepository::class);
+        $mockRepository->method('findOnlyTrashed')->willThrowException(new \Exception('Test exception'));
+
+        $controller = new CustomerController($mockRepository);
+
+        $response = $controller->restore('customer_id');
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJsonStringEqualsJsonString('{"message": "Ocorreu um erro ao processar a solicitação."}', $response->getContent());
     }
 }

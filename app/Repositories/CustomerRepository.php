@@ -69,12 +69,20 @@ class CustomerRepository
      *
      *
      */
-    public function update(Customer $customer, CustomerApiRequest $request): Customer
+    public function update(CustomerApiRequest $request): Customer
     {
-        $customer = $customer->fill($request->all());
-        $customer->save();
+        try {
+            DB::beginTransaction();
+            $customer = $this->find($request->id);
+            $customer = $customer->fill($request->all());
+            $customer->save();
+            DB::commit();
 
-        return $customer;
+            return $customer;
+        } catch (\Exception $e) {
+            DB::rollback();
+            throw $e;
+        }
     }
 
     /**
@@ -86,7 +94,17 @@ class CustomerRepository
      */
     public function destroy(string $customer): void
     {
-        Customer::destroy($customer);
+
+        try {
+            DB::beginTransaction();
+            $customerData = json_decode($customer, true);
+
+            Customer::destroy($customerData['id']);
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollback();
+            throw $e;
+        }
     }
 
     /**
@@ -98,9 +116,41 @@ class CustomerRepository
      */
     public function restore(string $customer)
     {
-        $restoreExist = Customer::withTrashed()->find($customer);
+        try {
+            DB::beginTransaction();
+            $restoreExist = $this->findOnlyTrashed($customer);
 
-        $restoreExist->restore();
-        return response()->json(['message' => 'Customer restored successfully']);
+            $restoreExist->restore();
+            DB::commit();
+
+            return response()->json(['message' => 'Customer restored successfully']);
+        } catch (\Exception $e) {
+            DB::rollback();
+            throw $e;
+        }
+    }
+
+    /**
+     * Display the specified customer.
+     *
+     * @param string $customer The unique identifier of the customer to restore.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function find(string $customer)
+    {
+        return Customer::find($customer);
+    }
+
+    /**
+     * Display the specified customer onlyTrashed.
+     *
+     * @param string $customer The unique identifier of the customer to restore.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function findOnlyTrashed(string $customer)
+    {
+        return Customer::onlyTrashed()->find($customer);
     }
 }
