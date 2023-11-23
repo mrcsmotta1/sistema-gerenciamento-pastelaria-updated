@@ -1964,11 +1964,7 @@
                                 "properties": {
                                     "name": {
                                         "type": "string",
-                                        "example": "Laptop"
-                                    },
-                                    "description": {
-                                        "type": "string",
-                                        "example": "A portable computer"
+                                        "example": "Pastéis Salgados"
                                     }
                                 },
                                 "type": "object"
@@ -1990,10 +1986,6 @@
                                         "name": {
                                             "type": "string",
                                             "example": "Laptop"
-                                        },
-                                        "description": {
-                                            "type": "string",
-                                            "example": "A portable computer"
                                         },
                                         "created_at": {
                                             "type": "string",
