@@ -62,12 +62,9 @@ class CustomerRepository
     /**
      * Update an existing customer.
      *
-     * @param Customer           $customer The customer to update.
      * @param CustomerApiRequest $request  The HTTP request with customer data.
      *
      * @return Customer The updated customer.
-     *
-     *
      */
     public function update(CustomerApiRequest $request): Customer
     {
@@ -97,9 +94,7 @@ class CustomerRepository
 
         try {
             DB::beginTransaction();
-            $customerData = json_decode($customer, true);
-
-            Customer::destroy($customerData['id']);
+            Customer::destroy($customer);
             DB::commit();
         } catch (\Exception $e) {
             DB::rollback();
