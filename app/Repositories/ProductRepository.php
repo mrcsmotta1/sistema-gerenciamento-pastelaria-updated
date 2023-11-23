@@ -53,33 +53,41 @@ class ProductRepository
      */
     public function add($data): Product
     {
-        return DB::transaction(function () use ($data) {
-            return $this->productService->createProduct($data);
-        });
+        return DB::transaction(
+            function () use ($data) {
+                return $this->productService->createProduct($data);
+            }
+        );
     }
 
     /**
      * Update an existing Product.
      *
-     * @param Product $product The product to update.
+     * @param $product \Illuminate\Http\Response
      * @param $request The HTTP request containing updated product data.
      *
      * @return Product The updated product.
      */
-    public function update(Product $product, $request): Product
+    public function update($product, $request): Product
     {
-        $isBase64 = base64_encode(base64_decode($request['photo'], true)) === $request['photo'] ? true : false;
+        try {
+            DB::beginTransaction();
+            $isBase64 = base64_encode(base64_decode($request['photo'], true)) === $request['photo'] ? true : false;
 
-        if ($isBase64) {
-            $pathImage = $this->productService->createImg($request['photo']);
-            $request['photo'] = $pathImage;
+            if ($isBase64) {
+                $pathImage = $this->productService->createImg($request['photo']);
+                $request['photo'] = $pathImage;
+            }
+
+            $product->update($request);
+            $product->save();
+            DB::commit();
+
+            return $product;
+        } catch (\Exception $e) {
+            DB::rollback();
+            throw $e;
         }
-
-        $product->update($request);
-
-        $product->save();
-
-        return $product;
     }
 
     /**
@@ -91,7 +99,14 @@ class ProductRepository
      */
     public function destroy(int $product): void
     {
-        Product::destroy($product);
+        try {
+            DB::beginTransaction();
+            Product::destroy($product);
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollback();
+            throw $e;
+        }
     }
 
     /**
@@ -103,8 +118,15 @@ class ProductRepository
      */
     public function restore(int $product): void
     {
-        $restore = Product::withTrashed()->where(['id' => $product]);
-        $restore->restore();
+        try {
+            DB::beginTransaction();
+            $restore = Product::withTrashed()->where(['id' => $product]);
+            $restore->restore();
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollback();
+            throw $e;
+        }
     }
 
     /**
@@ -114,9 +136,11 @@ class ProductRepository
      */
     public function index(): Collection
     {
-        return DB::transaction(function () {
-            return Product::query()->orderBy('name')->get();
-        });
+        return DB::transaction(
+            function () {
+                return Product::query()->orderBy('name')->get();
+            }
+        );
     }
 
     /**
@@ -135,5 +159,29 @@ class ProductRepository
         }
 
         return response()->json($result);
+    }
+
+    /**
+     * Display the specified product .
+     *
+     * @param string $product The unique identifier of the product  to restore.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function find(string $product)
+    {
+        return Product::find($product);
+    }
+
+    /**
+     * Display the specified customer onlyTrashed.
+     *
+     * @param string $product The unique identifier of the product to restore.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function findOnlyTrashed(string $product)
+    {
+        return Product::onlyTrashed()->find($product);
     }
 }

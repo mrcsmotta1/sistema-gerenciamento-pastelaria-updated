@@ -18,9 +18,14 @@ use App\Http\Requests\ProductApiRequest;
 use App\Models\Product;
 use App\Repositories\ProductRepository;
 use App\Rules\Base64File;
-use App\Services\ProductService;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * @OA\Tag(
+ *     name="Product",
+ *     description="Product-related operations, including creation, consultation, updating, soft deletion and restoration."
+ * )
+ */
 /**
  * Class ProductController
  *
@@ -30,24 +35,16 @@ use Symfony\Component\HttpFoundation\Response;
  * @license  MIT License
  * @link     https://github.com/mrcsmotta1/sistema-gerenciamento-pastelaria
  */
-/**
- * @OA\Tag(
- *     name="Product",
- *     description="Product-related operations, including creation, consultation, updating, soft deletion and restoration."
- * )
- */
 class ProductController extends Controller
 {
     /**
      * Create a new ProductController instance.
      *
      * @param ProductRepository $productRepository Product repository instance.
-     * @param ProductService    $productService    Product service instance.
      * @param Base64File        $base64File        base64File rules instance.
      */
     public function __construct(
         private ProductRepository $productRepository,
-        private ProductService $productService,
         private Base64File $base64File
     ) {
     }
@@ -223,12 +220,17 @@ class ProductController extends Controller
      *     ),
      * )
      */
-    public function show(string $id)
+    public function show(string $product)
     {
         try {
-            $result = $this->productRepository->show($id);
+            $result = $this->productRepository
+                ->find($product);
 
-            return $result;
+            if (!$result) {
+                return response()->json(['message' => 'Product not found.'], 404);
+            }
+
+            return response()->json($result);
         } catch (\Exception $e) {
             $message = "Ocorreu um erro ao processar a solicitação.";
             $statusCode = 500;
@@ -298,15 +300,16 @@ class ProductController extends Controller
     public function update(ProductApiRequest $request, $product)
     {
         try {
-            $product = Product::find($product);
-
-            $data = $request->all();
-
-            $data['photo'] = $this->base64File::getModifiedBase64() ?? $data['photo'];
+            $product = $this->productRepository
+                ->find($product);
 
             if (!$product) {
                 return response()->json(['message' => 'Product not found.'], 404);
             }
+
+            $data = $request->all();
+
+            $data['photo'] = $this->base64File::getModifiedBase64() ?? $data['photo'];
 
             return response()
                 ->json($this->productRepository->update($product, $data));
@@ -362,9 +365,10 @@ class ProductController extends Controller
     public function destroy(string $product)
     {
         try {
-            $productExist = Product::find($product);
+            $result = $this->productRepository
+                ->find($product);
 
-            if (!$productExist) {
+            if (!$result) {
                 return response()->json(['message' => 'Product not found.'], 404);
             }
 
@@ -417,11 +421,13 @@ class ProductController extends Controller
     public function restore(string $product)
     {
         try {
-            $productExist = Product::onlyTrashed()->find($product);
+            $result = $this->productRepository
+                ->findOnlyTrashed($product);
 
-            if (!$productExist) {
+            if (!$result) {
                 return response()->json(['message' => 'Product not found.'], 404);
             }
+
             $this->productRepository->restore($product);
             return response()->json(['message' => 'Product restored successfully']);
         } catch (\Exception $e) {
