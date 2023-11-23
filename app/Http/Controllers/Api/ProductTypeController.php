@@ -107,8 +107,7 @@ class ProductTypeController extends Controller
      *         required=true,
      *         @OA\JsonContent(
      *             required={"name", "description"},
-     *             @OA\Property(property="name", type="string", example="Laptop"),
-     *             @OA\Property(property="description", type="string", example="A portable computer"),
+     *             @OA\Property(property="name", type="string", example="Pastéis Salgados"),
      *         ),
      *     ),
      *     @OA\Response(
@@ -117,7 +116,6 @@ class ProductTypeController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="id", type="integer", example=1),
      *             @OA\Property(property="name", type="string", example="Laptop"),
-     *             @OA\Property(property="description", type="string", example="A portable computer"),
      *             @OA\Property(property="created_at", type="string", format="date-time", example="2023-11-10 17:47:46"),
      *             @OA\Property(property="updated_at", type="string", format="date-time", example="2023-11-10 17:47:46"),
      *             @OA\Property(property="deleted_at", type="string", format="date-time", example=null),
@@ -139,12 +137,19 @@ class ProductTypeController extends Controller
      */
     public function store(ProductTypeApiRequest $request)
     {
-        return response()
-            ->json(
-                $this->productTypeRepository
-                    ->add($request),
-                Response::HTTP_CREATED
-            );
+        try {
+            return response()
+                ->json(
+                    $this->productTypeRepository
+                        ->add($request),
+                    Response::HTTP_CREATED
+                );
+        } catch (\Exception $e) {
+            $message = "Ocorreu um erro ao processar a solicitação.";
+            $statusCode = 500;
+
+            return response()->json(['message' => $message], $statusCode);
+        }
     }
 
     /**
@@ -189,7 +194,8 @@ class ProductTypeController extends Controller
     public function show(string $productType)
     {
         try {
-            $result = ProductType::find($productType);
+            $result = $this->productTypeRepository
+                ->find($productType);
 
             if (!$result) {
                 return response()->json(['message' => 'Product Type not found.'], 404);
@@ -208,10 +214,10 @@ class ProductTypeController extends Controller
      * Update the specified productType in storage.
      *
      * @param \App\Http\Requests\ProductTypeApiRequest $request     ProductType data.
-     *
-     * @param string $productType The ID of the productType to soft delete.
+     * @param \Illuminate\Http\Response                $productType The customer to update.
      *
      * @return \Illuminate\Http\JsonResponse A JSON with updated productType.
+     *
      * @OA\Put(
      *     path="/api/product-types/{productTypeID}",
      *     summary="Update a specific product type by ID.",
@@ -250,12 +256,13 @@ class ProductTypeController extends Controller
      *     )
      * )
      */
-    public function update(ProductTypeApiRequest $request, string $productType)
+    public function update(ProductTypeApiRequest $request, $productType)
     {
         try {
-            $productType = ProductType::find($productType);
+            $result = $this->productTypeRepository
+                ->find($productType);
 
-            if (!$productType) {
+            if (!$result) {
                 return response()->json(['message' => 'Product Type not found.'], 404);
             }
 
@@ -307,9 +314,10 @@ class ProductTypeController extends Controller
     public function destroy(string $productType)
     {
         try {
-            $productTypeExist = ProductType::find($productType);
+            $result = $this->productTypeRepository
+                ->find($productType);
 
-            if (!$productTypeExist) {
+            if (!$result) {
                 return response()->json(['message' => 'Product Type not found.'], 404);
             }
 
@@ -361,10 +369,10 @@ class ProductTypeController extends Controller
     public function restore(string $productType)
     {
         try {
-            $productExist = ProductType::onlyTrashed()->find($productType);
+            $restoreExist = $this->productTypeRepository->findOnlyTrashed($productType);
 
-            if (!$productExist) {
-                return response()->json(['message' => 'Product not found.'], 404);
+            if (!$restoreExist) {
+                return response()->json(['message' => 'Product Type not found.'], 404);
             }
 
             $this->productTypeRepository->restore($productType);

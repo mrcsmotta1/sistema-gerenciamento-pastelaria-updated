@@ -14,8 +14,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\CustomerApiRequest;
 use App\Repositories\CustomerRepository;
+use App\Http\Requests\CustomerApiRequest;
 use Illuminate\Http\Response;
 
 /**
@@ -460,10 +460,10 @@ class CustomerController extends Controller
     public function destroy(string $customer)
     {
         try {
-            $customer = $this->customerRepository
+            $result = $this->customerRepository
                 ->find($customer);
 
-            if (!$customer) {
+            if (!$result) {
                 return response()->json(['message' => 'Customer not found.'], 404);
             }
 

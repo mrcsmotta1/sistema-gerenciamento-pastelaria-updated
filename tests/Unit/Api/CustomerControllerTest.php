@@ -13,14 +13,14 @@
 
 namespace Tests\Unit\Api;
 
-use App\Http\Controllers\Api\CustomerController;
-use App\Http\Requests\CustomerApiRequest;
-use App\Models\Customer;
-use App\Repositories\CustomerRepository;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Testing\Fluent\AssertableJson;
 use Mockery;
 use Tests\TestCase;
+use App\Models\Customer;
+use App\Repositories\CustomerRepository;
+use App\Http\Requests\CustomerApiRequest;
+use Illuminate\Testing\Fluent\AssertableJson;
+use App\Http\Controllers\Api\CustomerController;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
 /**
  * Class CustomerControllerTest
