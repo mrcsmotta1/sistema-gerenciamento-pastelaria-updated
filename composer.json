@@ -50,6 +50,9 @@
         ],
         "test": [
             "docker compose exec app php artisan config:clear && docker compose exec app php artisan cache:clear && docker-compose exec app php artisan test"
+        ],
+        "coverage": [
+            "docker compose exec app vendor/bin/phpunit --coverage-html storage/app/public/reports/"
         ]
     },
     "extra": {
