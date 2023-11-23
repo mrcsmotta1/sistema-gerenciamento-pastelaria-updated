@@ -16,6 +16,7 @@ namespace App\Repositories;
 use App\Http\Requests\ProductTypeApiRequest;
 use App\Models\ProductType;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Class ProductTypeRepository
@@ -52,35 +53,52 @@ class ProductTypeRepository
      */
     public function add(ProductTypeApiRequest $request): ProductType
     {
-        return ProductType::create($request->all());
+        return DB::transaction(function () use ($request) {
+            return ProductType::create($request->all());
+        });
     }
 
     /**
      * Update an existing ProductType.
      *
      * @param ProductTypeApiRequest $request     The HTTP ProductType data.
-     * @param $productType The ProductType to update.
+     * @param string                $productTypeId productType ID
      *
      * @return ProductType The updated ProductType.
      */
-    public function update(ProductTypeApiRequest $request, $productType): ProductType
+    public function update(ProductTypeApiRequest $request, $productTypeId): ProductType
     {
-        $ProductType = $productType->fill($request->all());
-        $ProductType->save();
+        try {
+            DB::beginTransaction();
+            $productType = $this->find($productTypeId);
+            $productType = $productType->fill($request->all());
+            $productType->save();
+            DB::commit();
 
-        return $ProductType;
+            return $productType;
+        } catch (\Exception $e) {
+            DB::rollback();
+            throw $e;
+        }
     }
 
     /**
      * Delete a ProductType by their ID.
      *
-     * @param string $ProductType The ID of the ProductType to delete.
+     * @param string $productType The ID of the ProductType to delete.
      *
      * @return void
      */
-    public function destroy(string $ProductType): void
+    public function destroy(string $productType): void
     {
-        ProductType::destroy($ProductType);
+        try {
+            DB::beginTransaction();
+            ProductType::destroy($productType);
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollback();
+            throw $e;
+        }
     }
 
     /**
@@ -94,5 +112,29 @@ class ProductTypeRepository
     {
         $restore = ProductType::withTrashed()->where(['id' => $productType]);
         $restore->restore();
+    }
+
+    /**
+     * Display the specified product Type.
+     *
+     * @param string $productType The unique identifier of the product Type to restore.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function find(string $productType)
+    {
+        return ProductType::find($productType);
+    }
+
+     /**
+     * Display the specified customer onlyTrashed.
+     *
+     * @param string $customer The unique identifier of the customer to restore.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function findOnlyTrashed(string $productType)
+    {
+        return ProductType::onlyTrashed()->find($productType);
     }
 }

@@ -13,7 +13,10 @@
 
 namespace Tests\Unit\Api;
 
+use App\Http\Controllers\Api\ProductTypeController;
+use App\Http\Requests\ProductTypeApiRequest;
 use App\Models\ProductType;
+use App\Repositories\ProductTypeRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Tests\TestCase;
@@ -306,5 +309,156 @@ class ProductTypeControllerTest extends TestCase
         $response->assertJson([
             'message' => 'Product Type not found.',
         ]);
+    }
+
+    /**
+     * This test should return error 500 in the Product Type index.
+     *
+     * @return void
+     */
+    public function test_index_must_return_error_500_when_there_is_an_error_product_type_endpoint(): void
+    {
+        $mockRepository = $this->createMock(ProductTypeRepository::class);
+        $mockRepository->method('index')->willThrowException(new \Exception('Test exception'));
+
+        $controller = new ProductTypeController($mockRepository);
+        $response = $controller->index();
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJson($response->getContent());
+        $expectedJson = '{"message": "Ocorreu um erro ao processar a solicitação."}';
+        $this->assertJsonStringEqualsJsonString($expectedJson, $response->getContent());
+    }
+
+    /**
+     * This test should return error 500 in the Product Type store.
+     *
+     * @return void
+     */
+    public function test_store_must_return_error_500_when_there_is_an_error_product_type_endpoint(): void
+    {
+        $mockRepository = $this->createMock(ProductTypeRepository::class);
+        $mockRepository->method('add')->willThrowException(new \Exception('Test exception'));
+
+        $controller = new ProductTypeController($mockRepository);
+
+        $request = new ProductTypeApiRequest();
+
+        $response = $controller->store($request);
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJsonStringEqualsJsonString('{"message": "Ocorreu um erro ao processar a solicitação."}', $response->getContent());
+    }
+
+    /**
+     * This test should return error 500 in the Product Type show.
+     *
+     * @return void
+     */
+    public function test_show_must_return_error_500_when_there_is_an_error_product_type_endpoint(): void
+    {
+        $mockRepository = $this->createMock(ProductTypeRepository::class);
+        $mockRepository->method('find')->willThrowException(new \Exception('Test exception'));
+
+        $controller = new ProductTypeController($mockRepository);
+
+        $response = $controller->show('customer_id');
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJsonStringEqualsJsonString('{"message": "Ocorreu um erro ao processar a solicitação."}', $response->getContent());
+    }
+
+    /**
+     * This test should return error 500 in the Product Type update.
+     *
+     * @return void
+     */
+    public function test_update_must_return_error_500_when_there_is_an_error_product_type_endpoint(): void
+    {
+        $result = ProductType::factory(1)->createOne();
+        $id = $result['id'];
+
+        $productTypeModel = new ProductType();
+
+        $repositoryMock = $this->getMockBuilder(ProductTypeRepository::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $repositoryMock->expects($this->once())
+            ->method('find')
+            ->will($this->returnValue($productTypeModel));
+
+        $repositoryMock->expects($this->once())
+            ->method('update')
+            ->willThrowException(new \Exception('Simulated error'));
+
+        $this->app->instance(ProductTypeRepository::class, $repositoryMock);
+
+        $productType = [
+            "id" => $id,
+            "name" => "Test Update",
+        ];
+
+        $response = $this->putJson("/api/product-types/{$id}", $productType);
+
+        $response->assertStatus(500);
+        $this->assertJsonStringEqualsJsonString('{"message": "Ocorreu um erro ao processar a solicitação."}', $response->getContent());
+    }
+
+    /**
+     * This test should return error 500 in the Customer show.
+     *
+     * @return void
+     */
+    public function test_delete_must_return_error_500_when_there_is_an_error_product_type_endpoint(): void
+    {
+        $mockRepository = $this->createMock(ProductTypeRepository::class);
+        $mockRepository->method('find')->willThrowException(new \Exception('Test exception'));
+
+        $controller = new ProductTypeController($mockRepository);
+
+        $response = $controller->destroy('customer_id');
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJsonStringEqualsJsonString('{"message": "Ocorreu um erro ao processar a solicitação."}', $response->getContent());
+    }
+
+    /**
+     * Test the 'update' endpoint for return 404.
+     *
+     * This test verifies that the 'update' endpoint in the product type controller correctly handles
+     * the update of customer information based on the provided data.
+     *
+     * @return void
+     */
+    public function test_post_restore_must_return_404_when_product_type_not_found_in_product_type_endpoint(): void
+    {
+        $result = ProductType::factory(1)->createOne();
+        $id = $result['id'] + rand(50, 100);
+
+        $response = $this->postJson("/api/product-types/{$id}/restore");
+
+        $response->assertStatus(404);
+        $response->assertJson([
+            'message' => 'Product Type not found.',
+        ]);
+    }
+
+     /**
+     * This test should return error 500 in the Customer show.
+     *
+     * @return void
+     */
+    public function test_post_restore_must_return_error_500_when_there_is_an_error_customer_endpoint(): void
+    {
+        $mockRepository = $this->createMock(ProductTypeRepository::class);
+        $mockRepository->method('findOnlyTrashed')->willThrowException(new \Exception('Test exception'));
+
+        $controller = new ProductTypeController($mockRepository);
+
+        $response = $controller->restore('customer_id');
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJsonStringEqualsJsonString('{"message": "Ocorreu um erro ao processar a solicitação."}', $response->getContent());
     }
 }
