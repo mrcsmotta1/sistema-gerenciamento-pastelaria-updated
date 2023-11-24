@@ -68,6 +68,13 @@ composer test
 > Note: API já estará acessível através do endereço http://localhost:8123/api
 
 > Note:  Além disso, o endereço http://localhost:8025 provê acesso ao serviço de e-mail _Mailpit_
+
+### Para visualizar a cobertura de testes execute:
+```shell
+composer coverage
+```
+> Note: O dashboard de cobertura de teste,estará acessível através do endereço: http://localhost:8123/storage/reports/index.html
+> Note: O dashboard com gráfico estará acessível através do endereço: http://localhost:8123/storage/reports/dashboard.html
    
 
 ### Documentação das rotas:
