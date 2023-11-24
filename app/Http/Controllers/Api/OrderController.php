@@ -241,9 +241,14 @@ class OrderController extends Controller
     public function show(string $order)
     {
         try {
-            $result = $this->orderRepository->show($order);
+            $result = $this->orderRepository
+                ->find($order);
 
-            return $result;
+            if (!$result) {
+                return response()->json(['message' => 'Order not found.'], 404);
+            }
+
+            return $this->orderRepository->show($order);
         } catch (\Exception $e) {
             $message = "Ocorreu um erro ao processar a solicitação.";
             $statusCode = 500;
@@ -322,7 +327,8 @@ class OrderController extends Controller
     public function update(OrderApiRequest $request, $order)
     {
         try {
-            $order = Order::find($order);
+            $order = $this->orderRepository
+                ->find($order);
 
             if (!$order) {
                 return response()->json(['message' => 'Order not found.'], 404);
@@ -381,9 +387,10 @@ class OrderController extends Controller
     public function destroy(string $order)
     {
         try {
-            $orderExist = Order::find($order);
+            $result = $this->orderRepository
+                ->find($order);
 
-            if (!$orderExist) {
+            if (!$result) {
                 return response()->json(['message' => 'Order not found.'], 404);
             }
 
@@ -445,9 +452,10 @@ class OrderController extends Controller
     public function restore(string $order)
     {
         try {
-            $orderExist = Order::onlyTrashed()->find($order);
+            $result = $this->orderRepository
+                ->findOnlyTrashed($order);
 
-            if (!$orderExist) {
+            if (!$result) {
                 return response()->json(['message' => 'Order not found.'], 404);
             }
 

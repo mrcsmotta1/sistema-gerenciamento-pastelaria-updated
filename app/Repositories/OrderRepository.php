@@ -13,15 +13,15 @@
 
 namespace App\Repositories;
 
-use Carbon\Carbon;
+use App\Http\Requests\OrderApiRequest;
+use App\Mail\OrderCreated;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Mail\OrderCreated;
-use Illuminate\Http\Response;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use App\Http\Requests\OrderApiRequest;
 
 /**
  * Class ProductRepository
@@ -82,37 +82,45 @@ class OrderRepository
      */
     public function store(OrderApiRequest $order): JsonResponse
     {
-        $orderSave = new Order(
-            [
-                'customer_id' => $order->customer_id,
-            ]
-        );
-
-        $orderSave->save();
-        $orderNumber = $orderSave->id;
-        $dateOfBirth = Carbon::parse($orderSave->customer->date_of_birth)
-            ->format('d/m/Y');
-
-        foreach ($order->products as $productData) {
-            $orderItem = new OrderItem(
+        try {
+            DB::beginTransaction();
+            $orderSave = new Order(
                 [
-                    'product_id' => $productData['product_id'],
-                    'quantity' => $productData['quantity'],
+                    'customer_id' => $order->customer_id,
                 ]
             );
 
-            $orderSave->items()->save($orderItem);
+            $orderSave->save();
+            $orderNumber = $orderSave->id;
+            $dateOfBirth = Carbon::parse($orderSave->customer->date_of_birth)
+                ->format('d/m/Y');
+
+            foreach ($order->products as $productData) {
+                $orderItem = new OrderItem(
+                    [
+                        'product_id' => $productData['product_id'],
+                        'quantity' => $productData['quantity'],
+                    ]
+                );
+
+                $orderSave->items()->save($orderItem);
+            }
+
+            DB::commit();
+
+            $message = [
+                'message' => 'Order created successfully',
+                'order' => $orderSave,
+            ];
+
+            Mail::to($orderSave->customer->email)
+                ->queue(new OrderCreated($orderSave, $orderNumber, $dateOfBirth));
+
+            return response()->json([$message], Response::HTTP_CREATED);
+        } catch (\Exception $e) {
+            DB::rollback();
+            throw $e;
         }
-
-        $message = [
-            'message' => 'Order created successfully',
-            'order' => $orderSave,
-        ];
-
-        Mail::to($orderSave->customer->email)
-            ->queue(new OrderCreated($orderSave, $orderNumber, $dateOfBirth));
-
-        return response()->json([$message], Response::HTTP_CREATED);
     }
 
     /**
@@ -150,12 +158,12 @@ class OrderRepository
     /**
      * Update an existing order.
      *
-     * @param Order           $order   The order to be updated.
+     * @param $product \Illuminate\Http\Response
      * @param OrderApiRequest $request The request with updated data.
      *
      * @return JsonResponse A JSON response indicating the result of the update.
      */
-    public function update(Order $order, OrderApiRequest $request): JsonResponse
+    public function update($order, OrderApiRequest $request): JsonResponse
     {
         $order = $order->fill($request->all());
 
@@ -247,11 +255,42 @@ class OrderRepository
      */
     public function restore(string $order): JsonResponse
     {
-        $restore = Order::withTrashed()->find($order);
-        $restore->restore();
+        try {
+            DB::beginTransaction();
+            $restore = Order::withTrashed()->find($order);
+            $restore->restore();
 
-        $restore->items()->where('removed', false)->restore();
+            $restore->items()->where('removed', false)->restore();
+            DB::commit();
 
-        return response()->json(['message' => 'Order restored successfully']);
+            return response()->json(['message' => 'Order restored successfully']);
+        } catch (\Exception $e) {
+            DB::rollback();
+            throw $e;
+        }
+    }
+
+    /**
+     * Display the specified order .
+     *
+     * @param string $order The unique identifier of the order to restore.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function find(string $order)
+    {
+        return Order::find($order);
+    }
+
+    /**
+     * Display the specified customer onlyTrashed.
+     *
+     * @param string $order The unique identifier of the order to restore.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function findOnlyTrashed(string $order)
+    {
+        return Order::onlyTrashed()->find($order);
     }
 }
