@@ -13,7 +13,14 @@
 
 namespace Tests\Unit\Api;
 
+use App\Http\Controllers\Api\OrderController;
+use App\Http\Requests\OrderApiRequest;
 use App\Mail\OrderCreated;
+use App\Models\Customer;
+use App\Models\Order;
+use App\Models\Product;
+use App\Models\ProductType;
+use App\Repositories\OrderRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -309,7 +316,7 @@ class OrderControllerTest extends TestCase
      *
      * @return void
      */
-    public function test_get_show_order_must_return_error_when_order_does_not_exist_endpoint(): void
+    public function test_get_show_order_must_return_error_404_when_order_does_not_exist_endpoint(): void
     {
         $response = $this->getJson('/api/orders/2');
 
@@ -476,5 +483,218 @@ class OrderControllerTest extends TestCase
             $this->assertEquals($mail->order->customer['date_of_birth'], $dateOfBirthCustomer);
             return true;
         });
+    }
+
+    /**
+     * This test should return error 500 in the Order index.
+     *
+     * @return void
+     */
+    public function test_index_must_return_error_500_when_there_is_an_error_order_endpoint(): void
+    {
+        $mockRepository = $this->createMock(OrderRepository::class);
+        $mockRepository->method('index')->willThrowException(new \Exception('Test exception'));
+
+        $controller = new OrderController($mockRepository);
+        $response = $controller->index();
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJson($response->getContent());
+        $expectedJson = '{"message": "Ocorreu um erro ao processar a solicitação."}';
+        $this->assertJsonStringEqualsJsonString($expectedJson, $response->getContent());
+    }
+
+    /**
+     * This test should return error 500 in the Order store.
+     *
+     * @return void
+     */
+    public function test_store_must_return_error_500_when_there_is_an_error_order_endpoint(): void
+    {
+        $mockRepository = $this->createMock(OrderRepository::class);
+        $mockRepository->method('store')->willThrowException(new \Exception('Test exception'));
+
+        $controller = new OrderController($mockRepository);
+
+        $request = new OrderApiRequest();
+
+        $response = $controller->store($request);
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJsonStringEqualsJsonString('{"message": "Ocorreu um erro ao processar a solicitação."}', $response->getContent());
+    }
+
+    /**
+     * This test should return error 500 in the Order show.
+     *
+     * @return void
+     */
+    public function test_show_must_return_error_500_when_there_is_an_error_order_endpoint(): void
+    {
+        $mockRepository = $this->createMock(OrderRepository::class);
+        $mockRepository->method('find')->willThrowException(new \Exception('Test exception'));
+
+        $controller = new OrderController($mockRepository);
+        $response = $controller->show('order_id');
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJson($response->getContent());
+        $expectedJson = '{"message": "Ocorreu um erro ao processar a solicitação."}';
+        $this->assertJsonStringEqualsJsonString($expectedJson, $response->getContent());
+    }
+
+    /**
+     * This test should return error 500 in the Order update.
+     *
+     * @return void
+     */
+    public function test_update_must_return_error_500_when_there_is_an_error_order_endpoint(): void
+    {
+        $mockRepository = $this->createMock(OrderRepository::class);
+        $mockRepository->method('find')->willThrowException(new \Exception('Test exception'));
+        $mockModel = $this->createMock(Order::class);
+        $mockOrderApiRequest = $this->createMock(OrderApiRequest::class);
+
+        $controller = new OrderController($mockRepository);
+
+        $response = $controller->update($mockOrderApiRequest, $mockModel);
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJson($response->getContent());
+        $expectedJson = '{"message": "Ocorreu um erro ao processar a solicitação."}';
+        $this->assertJsonStringEqualsJsonString($expectedJson, $response->getContent());
+    }
+
+    /**
+     * Test that the "update" endpoint for a order returns an error
+     * when the requested order does not exist.
+     *
+     * @return void
+     */
+    public function test_update_order_must_return_error_404_when_order_does_not_exist_endpoint(): void
+    {
+        Storage::fake('public');
+
+        $customer = Customer::factory()->create(['id' => 1]);
+
+        $productType = ProductType::factory(1)->createOne();
+
+        $products = [
+            'name' => 'teste',
+            "product_type_id" => $productType['id'],
+            'price' => "19.99",
+            'photo' => $this->base64Image,
+        ];
+
+        $responseProductType = $this->postJson('/api/products', $products);
+        $productTypeID = $responseProductType->json()[0]['product']['id'];
+
+        $orderRepositoryMock = $this->getMockBuilder(OrderRepository::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $requestData = [
+            "customer_id" => $customer->id,
+            "products" => [
+                [
+                    "product_id" => $productTypeID,
+                    "quantity" => 4,
+                ],
+            ],
+        ];
+
+        $orderApiRequest = new OrderApiRequest($requestData);
+
+        $idOrder = rand(100, 200);
+
+        $response = $this->put("/api/orders/{$idOrder}", $orderApiRequest->toArray());
+
+        $response->assertStatus(404);
+
+        $response->assertJson([
+            'message' => 'Order not found.',
+        ]);
+    }
+
+    /**
+     * Test that the "destroy" endpoint for a order returns an error
+     * when the requested order does not exist.
+     *
+     * @return void
+     */
+    public function test_destroy_order_must_return_error_404_when_order_does_not_exist_endpoint(): void
+    {
+        $idOrder = rand(100, 200);
+
+        $response = $this->deleteJson("/api/orders/{$idOrder}");
+
+        $response->assertStatus(404);
+
+        $response->assertJson([
+            'message' => 'Order not found.',
+        ]);
+    }
+
+     /**
+     * This test should return error 500 in the Order destroy.
+     *
+     * @return void
+     */
+    public function test_destroy_must_return_error_500_when_there_is_an_error_order_endpoint(): void
+    {
+        $mockRepository = $this->createMock(OrderRepository::class);
+        $mockRepository->method('find')->willThrowException(new \Exception('Test exception'));
+        $mockModel = $this->createMock(Order::class);
+        $mockOrderApiRequest = $this->createMock(OrderApiRequest::class);
+
+        $controller = new OrderController($mockRepository);
+
+        $response = $controller->destroy('order_id');
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJson($response->getContent());
+        $expectedJson = '{"message": "Ocorreu um erro ao processar a solicitação."}';
+        $this->assertJsonStringEqualsJsonString($expectedJson, $response->getContent());
+    }
+
+    /**
+     * Test that the "restore" endpoint for a order returns an error
+     * when the requested order does not exist.
+     *
+     * @return void
+     */
+    public function test_restore_order_must_return_error_404_when_order_does_not_exist_endpoint(): void
+    {
+        $idOrder = rand(100, 200);
+
+        $response = $this->postJson("/api/orders/{$idOrder}/restore");
+
+        $response->assertStatus(404);
+
+        $response->assertJson([
+            'message' => 'Order not found.',
+        ]);
+    }
+
+     /**
+     * This test should return error 500 in the Order restore.
+     *
+     * @return void
+     */
+    public function test_restore_must_return_error_500_when_there_is_an_error_order_endpoint(): void
+    {
+        $mockRepository = $this->createMock(OrderRepository::class);
+        $mockRepository->method('findOnlyTrashed')->willThrowException(new \Exception('Test exception'));
+        $mockModel = $this->createMock(Order::class);
+        $mockOrderApiRequest = $this->createMock(OrderApiRequest::class);
+
+        $controller = new OrderController($mockRepository);
+
+        $response = $controller->restore('order_id');
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertJson($response->getContent());
+        $expectedJson = '{"message": "Ocorreu um erro ao processar a solicitação."}';
+        $this->assertJsonStringEqualsJsonString($expectedJson, $response->getContent());
     }
 }
